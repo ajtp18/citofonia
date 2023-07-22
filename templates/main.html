@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<html lang="es">
+<head>
+    <title>Voice Caller</title>
+</head>
+
+<body>
+    <h1>Voice Caller</h1>
+    <p>Your Client ID: {{ client_id }}</p>
+    <form id="callForm">
+        <label for="recipient">Recipient ID:</label>
+        <input type="text" id="recipient" />
+        <button type="button" onclick="startCall()">Call</button>
+        <button type="button" onclick="stopCall()">Stop Call</button>
+    </form>
+    <audio id="remoteAudio" autoplay></audio> <!-- Elemento <audio> para reproducir el audio recibido -->
+
+    <!-- lista de client IDs disponibles -->
+    <form id="listClientsForm">
+        <button type="button" onclick="listAvailableClients()">List Available Clients</button>
+    </form>
+    <div id="clientList"></div>
+
+
+    <script>
+        const client_id = "{{ client_id }}";
+        const ws = new WebSocket(`ws://${window.location.host}/ws/${client_id}`);
+
+        function logMessage(message) {
+            console.log(`[DEBUG] ${message}`);
+        }
+
+        async function getAudioStream() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                logMessage("Audio stream obtained successfully.");
+                return stream;
+            } catch (error) {
+                console.error('Error al obtener el stream de audio:', error);
+                return null;
+            }
+        }
+
+        async function startCall() {
+            const recipientId = document.getElementById("recipient").value;
+
+            const peer = new RTCPeerConnection();
+
+            // Obtener la transmisión de audio del micrófono del cliente
+            const stream = await getAudioStream();
+            if (stream) {
+                stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+                logMessage("Audio tracks added to WebRTC peer connection.");
+            }
+
+            // Escuchar las señales generadas por la conexión
+            peer.onicecandidate = (event) => {
+                if (event.candidate) {
+                    // Enviar candidato ICE al destinatario a través del servidor WebSocket
+                    const message = JSON.stringify({
+                        sender_id: client_id,
+                        recipient_id: recipientId,
+                        type: "candidate",
+                        candidate: event.candidate,
+                    });
+                    ws.send(message);
+                }
+            };
+
+            // Escuchar la descripción de sesión generada por la conexión
+            peer.onnegotiationneeded = async () => {
+                const offer = await peer.createOffer();
+                await peer.setLocalDescription(offer);
+                const message = JSON.stringify({
+                    sender_id: client_id,
+                    recipient_id: recipientId,
+                    type: "offer",
+                    sdp: peer.localDescription.sdp,
+                });
+                ws.send(message);
+            };
+
+            // Establecer la descripción de sesión remota recibida del destinatario
+            ws.onmessage = async (event) => {
+                const data = JSON.parse(event.data);
+                if (data.sender_id === recipientId) {
+                    if (data.type === "offer") {
+                        await peer.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: data.sdp }));
+                        const answer = await peer.createAnswer();
+                        await peer.setLocalDescription(answer);
+                        const message = JSON.stringify({
+                            sender_id: client_id,
+                            recipient_id: recipientId,
+                            type: "answer",
+                            sdp: peer.localDescription.sdp,
+                        });
+                        ws.send(message);
+                    } else if (data.type === "answer") {
+                        await peer.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: data.sdp }));
+                    } else if (data.type === "candidate") {
+                        await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    }
+                }
+
+            };
+
+            // Establecer el flujo de audio recibido del destinatario
+            peer.ontrack = (event) => {
+                logMessage("Received remote audio track.");
+                const stream = event.streams[0];
+                const remoteAudio = document.getElementById("remoteAudio");
+                remoteAudio.srcObject = stream;
+            };
+        }
+
+        // Función para obtener la lista de client IDs disponibles
+        async function listAvailableClients() {
+            const response = await fetch("/available-clients");
+            const clientIds = await response.json();
+            const clientList = document.getElementById("clientList");
+            clientList.innerHTML = `<ul>Available Clients: ${clientIds.join(", ")}</ul>`;
+        }
+
+        function stopCall() {
+            window.location.reload();
+        }
+
+    </script>
+</body>
+
+</html>
