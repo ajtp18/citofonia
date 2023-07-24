@@ -1,11 +1,11 @@
+from aiortc import RTCConfiguration, RTCIceServer, RTCPeerConnection
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from starlette.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from starlette.requests import Request
-from starlette.templating import Jinja2Templates
-import json
-import random
 import string
-from aiortc import RTCConfiguration, RTCIceServer, RTCPeerConnection
+import random
+import json
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
