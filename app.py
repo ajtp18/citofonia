@@ -1,5 +1,6 @@
 from aiortc import RTCConfiguration, RTCIceServer, RTCPeerConnection, RTCSessionDescription, MediaStreamTrack
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 import string
 import random
 import json
@@ -12,6 +13,17 @@ active_clients = set()
 stun_server = RTCIceServer(urls="stun:stun.l.google.com:19302")
 
 configuration = RTCConfiguration(iceServers=[stun_server])
+
+origins = ["*"]
+
+# Agregar el middleware de CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class WebSocketRTC:
     def __init__(self, websocket: WebSocket, configuration: RTCConfiguration):
