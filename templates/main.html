@@ -2,11 +2,11 @@
 <html>
 <html lang="es">
 <head>
-    <title>Voice Caller</title>
+    <title>Video Caller</title>
 </head>
 
 <body>
-    <h1>Voice Caller</h1>
+    <h1>Video Caller</h1>
     <p>Your Client ID: {{ client_id }}</p>
     <form id="callForm">
         <label for="recipient">Recipient ID:</label>
@@ -14,7 +14,7 @@
         <button type="button" onclick="startCall()">Call</button>
         <button type="button" onclick="stopCall()">Stop Call</button>
     </form>
-    <audio id="remoteAudio" autoplay></audio> <!-- Elemento <audio> para reproducir el audio recibido -->
+    <video id="remoteVideo" autoplay></video> <!-- Elemento <video> para reproducir el video recibido -->
 
     <!-- lista de client IDs disponibles -->
     <form id="listClientsForm">
@@ -31,13 +31,13 @@
             console.log(`[DEBUG] ${message}`);
         }
 
-        async function getAudioStream() {
+        async function getMediaStream() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                logMessage("Audio stream obtained successfully.");
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                logMessage("Media stream obtained successfully.");
                 return stream;
             } catch (error) {
-                console.error('Error al obtener el stream de audio:', error);
+                console.error('Error al obtener el stream de audio y video:', error);
                 return null;
             }
         }
@@ -47,11 +47,11 @@
 
             const peer = new RTCPeerConnection();
 
-            // Obtener la transmisión de audio del micrófono del cliente
-            const stream = await getAudioStream();
+            // Obtener la transmisión de audio y video del cliente
+            const stream = await getMediaStream();
             if (stream) {
                 stream.getTracks().forEach((track) => peer.addTrack(track, stream));
-                logMessage("Audio tracks added to WebRTC peer connection.");
+                logMessage("Audio and video tracks added to WebRTC peer connection.");
             }
 
             // Escuchar las señales generadas por la conexión
@@ -102,15 +102,14 @@
                         await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
                     }
                 }
-
             };
 
-            // Establecer el flujo de audio recibido del destinatario
+            // Establecer el flujo de audio y video recibido del destinatario
             peer.ontrack = (event) => {
-                logMessage("Received remote audio track.");
+                logMessage("Received remote audio and video track.");
                 const stream = event.streams[0];
-                const remoteAudio = document.getElementById("remoteAudio");
-                remoteAudio.srcObject = stream;
+                const remoteVideo = document.getElementById("remoteVideo");
+                remoteVideo.srcObject = stream;
             };
         }
 
